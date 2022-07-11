@@ -1,3 +1,7 @@
+My fork of mech-transformer-jax with configs for use in my hierchical long document model project.
+
+See [How to finetune](https://github.com/kingoflolz/mesh-transformer-jax/blob/master/howto_finetune.md) for steps to fintune the model on our data.
+
 # Table of contents
 1. [Mesh Transformer JAX](#mesh-transformer-jax)
     1. [Updates](#updates)
