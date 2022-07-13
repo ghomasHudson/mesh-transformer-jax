@@ -19,24 +19,19 @@
   "weight_decay": 0.1,
   "total_steps": 350000,
 
-  "tpu_size": 256,
+  "tpu_size": 8,
 
   "bucket": "neo-models",
-  "model_dir": "mesh_jax_pile_6B_rotary",
+  "model_dir": "gptj_booksum",
 
-  "train_set": "pile.train.index",
+  "train_set": "booksum.train.index",
   "val_set": {
-    "pile": "pile.val.index",
-    "owt": "openwebtext2_new_inputs.val.index"
+    "pile": "booksum.val.index"
   },
 
   "eval_harness_tasks": [
     "lambada",
-    "piqa",
     "hellaswag",
-    "winogrande",
-    "mathqa",
-    "pubmedqa"
   ],
 
   "val_batches": 100,
@@ -44,7 +39,7 @@
   "ckpt_every": 500,
   "keep_every": 10000,
 
-  "name": "GPT3_6B_pile_rotary",
-  "wandb_project": "mesh-transformer-jax",
-  "comment": ""
+  "name": "GPT3_6B_booksum",
+  "wandb_project": "GPT3_6B_long_doc",
+  "comment": "Training GPTJ_6B on openai booksum machine samples"
 }
