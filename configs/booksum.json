@@ -21,8 +21,8 @@
 
   "tpu_size": 8,
 
-  "bucket": "neo-models",
-  "model_dir": "gptj_booksum",
+  "bucket": "muld_data",
+  "model_dir": "models/gptj_booksum",
 
   "train_set": "booksum.train.index",
   "val_set": {
