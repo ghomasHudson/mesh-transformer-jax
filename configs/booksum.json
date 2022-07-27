@@ -26,13 +26,10 @@
 
   "train_set": "booksum.train.index",
   "val_set": {
-    "pile": "booksum.val.index"
+    "dummy": "booksum.train.index"
   },
 
-  "eval_harness_tasks": [
-    "lambada",
-    "hellaswag",
-  ],
+  "eval_harness_tasks": [],
 
   "val_batches": 100,
   "val_every": 99999999,
