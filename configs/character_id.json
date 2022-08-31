@@ -22,7 +22,7 @@
   "tpu_size": 8,
 
   "bucket": "muld_data",
-  "model_dir": "models/gptj_hotpotqa",
+  "model_dir": "models/gptj_character_id",
 
   "train_set": "character_id.train.index",
   "val_set": {},
