@@ -211,7 +211,6 @@ lightgbm==2.2.3
 llvmlite==0.39.0
 lm-dataformat==0.0.20
 lm-eval @ git+https://github.com/EleutherAI/lm-evaluation-harness/@b0b76d87fc84b2bfdfa88b71ce4592f35f707428
-lmdb==0.99
 locket==1.0.0
 logical-unification==0.4.5
 LunarCalendar==0.0.9
