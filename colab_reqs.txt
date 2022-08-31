@@ -92,7 +92,6 @@ ephem==4.1.3
 et-xmlfile==1.1.0
 etils==0.7.1
 etuples==0.3.5
-fa2==0.3.5
 fabric==2.6.0
 fastai==2.7.9
 fastapi==0.81.0
