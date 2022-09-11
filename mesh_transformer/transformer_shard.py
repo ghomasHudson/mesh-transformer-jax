@@ -199,6 +199,7 @@ class CausalTransformer:
                     next_token, decode_state, sample_key = carry
                     sample_key, new_key = jax.random.split(sample_key)
 
+
                     logits, new_state = transformer.generate_once(next_token, decode_state)
                     next_token, sample_info = sampler(sample_key, logits, sampler_input, **sampler_options)
 
@@ -244,7 +245,8 @@ class CausalTransformer:
                                                                  ["batch", ...],
                                                                  ["batch", ...],
                                                                  ["batch", ...]),
-                                                        out_axes=["batch", ...],
+                                                        #out_axes=["batch", ...],
+                                                        out_axes=(["shard", "batch", ...], ["batch", ...]),
                                                         axis_resources={'shard': 'mp', 'batch': 'dp'})
 
         self.move_xmap = jax.experimental.maps.xmap(fun=lambda x, _: to_bf16(x),
