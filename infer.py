@@ -1,3 +1,52 @@
+
+import datasets
+
+TASK_MAP = {
+    "translation": {
+        "model": "ghomasHudson/gptj_long_contra_pro",
+        "dataset": "ghomasHudson/long_contra_pro"
+    },
+    "char_id": {
+        "model": "ghomasHudson/character_id",
+        "dataset": "ghomasHudson/character_id"
+    }
+}
+
+ds = datasets.load_dataset(TASK_MAP["char_id"]["dataset"])
+if "test" in ds:
+    ds = ds["test"]
+else:
+    ds = ds["valid"]
+
+
+# Split into chunks
+CHUNK_SIZE = 512
+
+def make_chunks(lst, n):
+    """Yield successive n-sized chunks from lst."""
+    was_str = False
+    if isinstance(lst, str):
+        was_str = True
+        lst = lst.split(" ")
+
+    for i in range(0, len(lst), n):
+        if was_str:
+            yield " ".join(lst[i:i + n])
+        else:
+            yield lst[i:i + n]
+
+# Eval
+logger.info("Predicting...")
+X = []
+y = []
+for ex in ds:
+    chunks = list(make_chunks(ex["document"]["text"], CHUNK_SIZE))
+    # y.append(ex["character_type"])
+    breakpoint()
+
+
+
+
 import argparse
 import json
 import time
