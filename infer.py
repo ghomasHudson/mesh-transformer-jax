@@ -1,26 +1,70 @@
+import argparse
+import json
+import time
+from loguru import logger
 
+import jax
+import numpy as np
+import optax
+from tqdm import tqdm
+
+from mesh_transformer import util
+from mesh_transformer.checkpoint import read_ckpt
+from mesh_transformer.sampling import nucleaus_sample
+from mesh_transformer.transformer_shard import CausalTransformer
+import transformers
+from smart_open import open
+
+from mesh_transformer.util import clip_by_global_norm 
 import datasets
+import re
+
+CHUNK_SIZE = 512
 
 TASK_MAP = {
     "translation": {
         "model": "ghomasHudson/gptj_long_contra_pro",
-        "dataset": "ghomasHudson/long_contra_pro"
+        "dataset": "ghomasHudson/long_contra_pro",
+        "output_max_len": CHUNK_SIZE + 10
     },
     "char_id": {
         "model": "ghomasHudson/character_id",
-        "dataset": "ghomasHudson/character_id"
+        "dataset": "ghomasHudson/character_id",
+        "output_max_len": 5
+    },
+    "qa": {
+        "model": "ghomasHudson/character_id",
+        "dataset": "ghomasHudson/hotpotExtendedAno",
+        "output_max_len": 30
+    },
+    "summarization": {
+        "model": "ghomasHudson/booksum",
+        "dataset": "ghomasHudson/booksum_ds",
+        "output_max_len": int(CHUNK_SIZE * 0.75)
     }
 }
 
-ds = datasets.load_dataset(TASK_MAP["char_id"]["dataset"])
-if "test" in ds:
-    ds = ds["test"]
-else:
-    ds = ds["valid"]
+TASK = "summarization"
 
 
-# Split into chunks
-CHUNK_SIZE = 512
+
+def parse_args():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default=None, help="Config file location")
+
+    args = parser.parse_args()
+    return args
+
+
+def parse_lm_string(s):
+    '''Turns a language model string with <|key|> value sections into a dict'''
+    sSplit = re.split(r'<\|(.+)\|>', s)
+    out_dict = {}
+    for i in range(1, len(sSplit), 2):
+        out_dict[sSplit[i]] = sSplit[i+1].strip()
+    return out_dict
+
 
 def make_chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
@@ -35,43 +79,29 @@ def make_chunks(lst, n):
         else:
             yield lst[i:i + n]
 
-# Eval
-logger.info("Predicting...")
-X = []
-y = []
-for ex in ds:
-    chunks = list(make_chunks(ex["document"]["text"], CHUNK_SIZE))
-    # y.append(ex["character_type"])
-    breakpoint()
 
+def infer(context, output_length=512):
+    '''Produces an inference from a context input'''
+    start = time.time()
+    tokens = tokenizer.encode(context)
+    provided_ctx = len(tokens)
+    pad_amount = seq - provided_ctx
 
+    padded_tokens = np.pad(tokens, ((pad_amount, 0),)).astype(np.uint32)
+    batched_tokens = np.array([padded_tokens] * total_batch)
+    length = np.ones(total_batch, dtype=np.uint32) * len(tokens)
 
-
-import argparse
-import json
-import time
-
-import jax
-import numpy as np
-import optax
-
-from mesh_transformer import util
-from mesh_transformer.checkpoint import read_ckpt
-from mesh_transformer.sampling import nucleaus_sample
-from mesh_transformer.transformer_shard import CausalTransformer
-import transformers
-from smart_open import open
-
-from mesh_transformer.util import clip_by_global_norm
-
-
-def parse_args():
-    # Parse command line arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default=None, help="Config file location")
-
-    args = parser.parse_args()
-    return args
+    # generate(ctx,ctx_length, gen_length, sampler_options)
+    output = network.generate(
+        batched_tokens,
+        length,
+        output_length,
+        {"top_p": np.ones(total_batch) * 0.9, "temp": np.ones(total_batch) * 0.75}
+    )
+    output = output[1][0][:, :, 0][0]
+    text = tokenizer.decode(output)
+    #print(f"completion done in {time.time() - start:06}s")
+    return text.split("<|endoftext|>", 1)[0]
 
 
 if __name__ == "__main__":
@@ -120,11 +150,12 @@ if __name__ == "__main__":
 
     total_batch = per_replica_batch * jax.device_count() // cores_per_replica
     with jax.experimental.maps.mesh(devices, ('dp', 'mp')):
+        # Load network
         network = CausalTransformer(params)
 
         start = time.time()
         network.state = read_ckpt(network.state, f"gs://{bucket}/{model_dir}/step_{ckpt_step}/", devices.shape[1])
-        print(f"network loaded in {time.time() - start:.06}s")
+        logger.info(f"network loaded in {time.time() - start:.06}s")
 
         local_shards = max(jax.local_device_count() // mesh_shape[1], 1)
         del network.state["opt_state"]
@@ -132,39 +163,83 @@ if __name__ == "__main__":
 
         tokenizer = transformers.GPT2TokenizerFast.from_pretrained('gpt2')
 
-
+        # ***************************************************
         # Do inference
-        def infer(context, output_length=512):
-            '''Produces an inference from a context input'''
+
+        # Load dataset
+        ds = datasets.load_dataset(TASK_MAP[TASK]["dataset"], use_auth_token=True)
+        if "test" in ds:
+            ds = ds["test"]
+        else:
+            ds = ds["validation"]
+
+
+        # Eval
+        preds = []
+        trues = []
+        for ex in ds:
             start = time.time()
-            tokens = tokenizer.encode(context)
-            provided_ctx = len(tokens)
-            pad_amount = seq - provided_ctx
+            if TASK == "qa":
+                question, text = ex["input"].split("?", 1)
+                true_answer = ex["output"][0]
+            if TASK == "translation":
+                text = ex["translation"]["en"]
+                true_answer = ex["translation"]["de"]
+            if TASK == "summarization":
+                text = ex["input"]
+                true_answer = ex["output"]
 
-            padded_tokens = np.pad(tokens, ((pad_amount, 0),)).astype(np.uint32)
-            batched_tokens = np.array([padded_tokens] * total_batch)
-            length = np.ones(total_batch, dtype=np.uint32) * len(tokens)
 
-            # generate(ctx,ctx_length, gen_length, sampler_options)
-            output = network.generate(
-                batched_tokens,
-                length,
-                output_length,
-                {"top_p": np.ones(total_batch) * 0.9, "temp": np.ones(total_batch) * 0.75}
-            )
-            output = output[1][0][:, :, 0][0]
-            text = tokenizer.decode(output)
-            print(f"completion done in {time.time() - start:06}s")
-            return text.split("<|endoftext|>", 1)[0]
+            intermediate_output = text.strip()
+            final_output = ""
+            i = 0 
+            while len(intermediate_output.split()) > CHUNK_SIZE * 1.2 and i < 20:
+                logger.info("")
+                logger.info(f"Level {i} - {len(intermediate_output.split())} tokens")
+                i += 1
+                chunks = list(make_chunks(intermediate_output, CHUNK_SIZE))
+                intermediate_output = ""
+                if TASK == "qa":
+                    chunks = ["<|question|> " + question + "\n<|context|> " + c + "\n<|facts|>" for c in chunks]
+                elif TASK == "translation":
+                    chunks = ["<|input|> " + c + "\n<|output|>" for c in chunks]
+                elif TASK == "summarization":
+                    chunks = ["<|input|> " + c + "\n<|output|>" for c in chunks]
 
-        context = """<|character|> Bob
-        <|text|> Bob was a great guy, he is a real lad.
-        <|output|>"""
-        print(infer(context))
+                for chunk in tqdm(chunks):
+                    output = chunk + infer(chunk, output_length=TASK_MAP[TASK]["output_max_len"])
+                    output_d = parse_lm_string(output)
+                    if TASK == "qa":
+                        intermediate_output += " " + output_d.get("fact", "")
+                    elif TASK == "translation":
+                        final_output += " " + output_d.get("output", "")
+                    if TASK == "summarization":
+                        intermediate_output += " " + output_d.get("output", "")
 
-        context = """
-        <|text|> Hero | Hero | Villain | Hero | Villain | Villain | Villain | Villain | Hero |
-        <|output|>"""
-        print(infer(context))
+            # Final output
+            if TASK == "qa":
+                chunk = "<|question|> " + question + "\n<|context|> " + intermediate_output + "\n<|facts|>"
+                output = chunk + infer(chunk)
+                output_d = parse_lm_string(output)
+                pred_answer = output_d.get("answer", "")
+            if TASK == "translation":
+                #chunk = "<|input|> " + intermediate_output + "\n<|output|>"
+                #output = chunk + infer(chunk)
+                #output_d = parse_lm_string(output)
+                #pred_answer = output_d.get("output", "")
+                pred_answer = final_output
+            if TASK == "summarization":
+                chunk = "<|input|> " + intermediate_output + "\n<|output|>"
+                output = chunk + infer(chunk)
+                output_d = parse_lm_string(output)
+                pred_answer = output_d.get("output", "")
 
-        breakpoint()
+            print(pred_answer[:100])
+            print(true_answer[:100])
+            preds.append(pred_answer)
+            trues.append(true_answer)
+
+            print(f"example done in {time.time() - start:06}s")
+            breakpoint()
+
+
