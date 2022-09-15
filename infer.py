@@ -7,6 +7,7 @@ import jax
 import numpy as np
 import optax
 from tqdm import tqdm
+import nltk
 
 from mesh_transformer import util
 from mesh_transformer.checkpoint import read_ckpt
@@ -15,7 +16,7 @@ from mesh_transformer.transformer_shard import CausalTransformer
 import transformers
 from smart_open import open
 
-from mesh_transformer.util import clip_by_global_norm 
+from mesh_transformer.util import clip_by_global_norm
 import datasets
 import re
 
@@ -46,6 +47,107 @@ TASK_MAP = {
 
 TASK = "summarization"
 
+def seq2seq_metrics(preds, true_answers):
+    '''Calculate metrics for seq2seq output'''
+
+    # Make list of preds per example
+    if isinstance(true_answers[0], str):
+        true_answers = [[chunk] for chunk in true_answers]
+
+    # if differing num per example, duplicate
+    len_true_answers = max([len(p) for p in true_answers])
+    for i in range(len(true_answers)):
+        if len(true_answers[i]) < len_true_answers:
+            diff = len_true_answers - len(true_answers[i])
+            true_answers[i] = true_answers[i] + [true_answers[i][0]] * diff
+
+    output = {}
+
+    # Exact Match
+    # em = load_metric('exact_match.py', experiment_id=str(time.time()))
+    # score = em.compute(predictions=preds, references=[o[0] for o in true_answers])
+    # output["exact_match"] = score["accuracy"]
+    output["em"] = f1_score(preds, [o[0] for o in true_answers], average='macro')
+
+
+    # Bleu
+    bleu = datasets.load_metric('bleu', experiment_id=str(time.time()))
+    preds_split = [s.split() for s in preds]
+    true_answers_split = [[s.split() for s in x] for x in true_answers]
+    score = bleu.compute(predictions=preds_split, references=true_answers_split)
+    output["bleu"] = score["bleu"]
+    for i in range(len(score["precisions"])):
+        output["bleu-"+str(i+1)] = score["precisions"][i]
+
+    # Rouge
+    rouge = datasets.load_metric('rouge', experiment_id=str(time.time()),use_agregator=False)
+    scores = []
+    for i in range(len(true_answers[0])):
+        scores.append(rouge.compute(predictions=preds, references=[o[i] for o in true_answers], use_agregator=False))
+    max_scores = {}
+    for i in range(len(preds)):
+        item_scores = {}
+        for score in scores:
+            for k in score:
+                item_scores[k] = max(item_scores.get(k, 0), score[k][i].fmeasure)
+        for k in item_scores:
+            max_scores[k] = max_scores.get(k, []) + [item_scores[k]]
+    for k in max_scores:
+        output[k] = np.average(max_scores[k])
+
+    # Meteor
+    from nltk.translate import meteor_score
+    scores = []
+    for i in range(len(preds)):
+        score = 0
+        for j in range(len(true_answers[i])):
+            score = max(score, meteor_score.single_meteor_score(true_answers[i][j], preds[i], alpha=0.9, beta=3, gamma=0.5))
+        scores.append(score)
+    output["meteor"] = np.average(scores)
+    score = meteor.compute(predictions=preds, references=true_answers)["meteor"]
+    output["meteor"] = score
+
+    # Bert score
+    '''
+    try:
+        bert = load_metric('bertscore', experiment_id=str(time.time()),use_agregator=True)
+        # score = bert.compute(predictions=preds, references=[o[0] for o in true_answers], lang="en")
+        scores = []
+        for i in range(len(true_answers[0])):
+            scores.append(bert.compute(predictions=preds, references=[o[i] for o in true_answers],lang="en")["f1"])
+        max_scores = []
+        for i in range(len(preds)):
+            item_score = scores[0][i]
+            for score in scores[1:]:
+                item_score = max(item_score, score[i])
+            max_scores.append(item_score)
+        output["bert_score"] = np.average(max_scores)
+    except RuntimeError as e:
+        print(e)
+    '''
+
+    # BLEURT (last as memory use is unconstrained
+    '''
+    try:
+        bleurt = load_metric('bleurt')
+        scores = []
+        for i in range(len(true_answers[0])):
+            scores.append(bleurt.compute(predictions=preds, references=[o[i] for o in true_answers])["scores"])
+        max_scores = []
+        for i in range(len(preds)):
+            item_score = scores[0][i]
+            for score in scores[1:]:
+                item_score = max(item_score, score[i])
+            max_scores.append(item_score)
+        output["bleurt"] = np.average(max_scores)
+    except:
+        pass
+    '''
+
+    return output
+
+print(seq2seq_metrics("This is a prediction", ["This is not a prediction", "This is an onion"]))
+breakpoint()
 
 
 def parse_args():
@@ -192,7 +294,7 @@ if __name__ == "__main__":
 
             intermediate_output = text.strip()
             final_output = ""
-            i = 0 
+            i = 0
             while len(intermediate_output.split()) > CHUNK_SIZE * 1.2 and i < 20:
                 logger.info("")
                 logger.info(f"Level {i} - {len(intermediate_output.split())} tokens")
