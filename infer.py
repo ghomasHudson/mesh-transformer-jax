@@ -50,7 +50,6 @@ TASK_MAP = {
     }
 }
 
-TASK = "summarization"
 
 def seq2seq_metrics(preds, true_answers):
     '''Calculate metrics for seq2seq output'''
@@ -168,6 +167,7 @@ def parse_args():
     # Parse command line arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default=None, help="Config file location")
+    parser.add_argument("--task_type", type=str, nargs="?", default=None, choices=list(TASK_MAP.keys()), help="Task type")
 
     args = parser.parse_args()
     return args
@@ -223,6 +223,20 @@ def infer(context, output_length=512):
 if __name__ == "__main__":
     args = parse_args()
     params = json.load(open(args.config))
+
+    # Infer task type (override if specified)
+    if args.task_type is None:
+        if "long_contra_pro" in args.config:
+            TASK = "translation"
+        elif "booksum" in args.config:
+            TASK = "summarization"
+        elif "qa" in args.config.lower():
+            TASK = "qa"
+        elif "char" in args.config:
+            TASK = "char_id"
+    else:
+        TASK == args.task_type
+    logger.info(f"Set task type to {TASK}")
 
     gradient_accumulation_steps = params.get("gradient_accumulation_steps", 1)
     per_replica_batch = params["per_replica_batch"]
@@ -306,7 +320,13 @@ if __name__ == "__main__":
         for ex_idx, ex in enumerate(ds):
             start = time.time()
             if TASK == "qa":
-                question, text = ex["input"].split("?", 1)
+                if len(ex["input"].split("?", 1)) == 2:
+                    question, text = ex["input"].split("?", 1)
+                else:
+                    try:
+                        question, text = ex["input"].split(".", 1)
+                    except:
+                        continue
                 true_answer = ex["output"][0]
             if TASK == "translation":
                 text = ex["translation"]["en"]
