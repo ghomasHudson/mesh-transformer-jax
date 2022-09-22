@@ -2,6 +2,7 @@ import argparse
 import json
 import time
 from loguru import logger
+import os
 
 import jax
 import numpy as np
@@ -15,10 +16,13 @@ from mesh_transformer.sampling import nucleaus_sample
 from mesh_transformer.transformer_shard import CausalTransformer
 import transformers
 from smart_open import open
+from sklearn.metrics import f1_score
 
 from mesh_transformer.util import clip_by_global_norm
 import datasets
 import re
+import wandb
+
 
 CHUNK_SIZE = 512
 
@@ -42,6 +46,7 @@ TASK_MAP = {
         "model": "ghomasHudson/booksum",
         "dataset": "ghomasHudson/booksum_ds",
         "output_max_len": int(CHUNK_SIZE * 0.75)
+        #"output_max_len": 5
     }
 }
 
@@ -49,6 +54,8 @@ TASK = "summarization"
 
 def seq2seq_metrics(preds, true_answers):
     '''Calculate metrics for seq2seq output'''
+
+    assert len(preds) == len(true_answers)
 
     # Make list of preds per example
     if isinstance(true_answers[0], str):
@@ -80,21 +87,23 @@ def seq2seq_metrics(preds, true_answers):
         output["bleu-"+str(i+1)] = score["precisions"][i]
 
     # Rouge
-    rouge = datasets.load_metric('rouge', experiment_id=str(time.time()),use_agregator=False)
+    rouge = datasets.load_metric('rouge', experiment_id=str(time.time()))
     scores = []
     for i in range(len(true_answers[0])):
-        scores.append(rouge.compute(predictions=preds, references=[o[i] for o in true_answers], use_agregator=False))
+        scores.append(rouge.compute(predictions=preds, references=[o[i] for o in true_answers], use_aggregator=False))
     max_scores = {}
-    for i in range(len(preds)):
+
+    for i in range(len(preds)): # one per example in ds
         item_scores = {}
-        for score in scores:
-            for k in score:
+        for score in scores: # one per reference
+            for k in score: # one per rouge type (rouge1, rouge2, rougeL....)
                 item_scores[k] = max(item_scores.get(k, 0), score[k][i].fmeasure)
         for k in item_scores:
             max_scores[k] = max_scores.get(k, []) + [item_scores[k]]
     for k in max_scores:
         output[k] = np.average(max_scores[k])
 
+    '''
     # Meteor
     from nltk.translate import meteor_score
     scores = []
@@ -106,6 +115,11 @@ def seq2seq_metrics(preds, true_answers):
     output["meteor"] = np.average(scores)
     score = meteor.compute(predictions=preds, references=true_answers)["meteor"]
     output["meteor"] = score
+    '''
+
+    # Meteor
+    meteor = datasets.load_metric('meteor')
+    output["meteor"] = meteor.compute(predictions=preds, references=true_answers)["meteor"]
 
     # Bert score
     '''
@@ -146,9 +160,9 @@ def seq2seq_metrics(preds, true_answers):
 
     return output
 
-print(seq2seq_metrics("This is a prediction", ["This is not a prediction", "This is an onion"]))
-breakpoint()
-
+#metrics = seq2seq_metrics(["Hello world this is text"], ["Hello world this is text"])
+#print(metrics)
+#import sys;sys.exit()
 
 def parse_args():
     # Parse command line arguments
@@ -185,7 +199,7 @@ def make_chunks(lst, n):
 def infer(context, output_length=512):
     '''Produces an inference from a context input'''
     start = time.time()
-    tokens = tokenizer.encode(context)
+    tokens = tokenizer.encode(context)[:seq]
     provided_ctx = len(tokens)
     pad_amount = seq - provided_ctx
 
@@ -249,6 +263,14 @@ if __name__ == "__main__":
 
     ckpt_step = meta["checkpoints"][-1]
     print(f"using checkpoint {ckpt_step}")
+    wandb.init(project="GPT3_6B_long_doc",
+        name=f"{TASK}_eval",
+        job_type="eval",
+        tags=["eval", TASK])
+    wandb.config.update(args)
+    wandb.config.update({"params": params})
+    wandb.config.update({"model_meta":meta})
+    wandb.config.update({"task_config": TASK_MAP[TASK]})
 
     total_batch = per_replica_batch * jax.device_count() // cores_per_replica
     with jax.experimental.maps.mesh(devices, ('dp', 'mp')):
@@ -268,6 +290,7 @@ if __name__ == "__main__":
         # ***************************************************
         # Do inference
 
+
         # Load dataset
         ds = datasets.load_dataset(TASK_MAP[TASK]["dataset"], use_auth_token=True)
         if "test" in ds:
@@ -279,7 +302,8 @@ if __name__ == "__main__":
         # Eval
         preds = []
         trues = []
-        for ex in ds:
+        preds_table = wandb.Table(columns=["example_idx", "input", "true_output", "pred_output"])
+        for ex_idx, ex in enumerate(ds):
             start = time.time()
             if TASK == "qa":
                 question, text = ex["input"].split("?", 1)
@@ -295,12 +319,19 @@ if __name__ == "__main__":
             intermediate_output = text.strip()
             final_output = ""
             i = 0
+
+
+            os.mkdir(os.path.join(wandb.run.dir, f"example_{ex_idx:06}"))
+
             while len(intermediate_output.split()) > CHUNK_SIZE * 1.2 and i < 20:
+            #while i < 1:
                 logger.info("")
                 logger.info(f"Level {i} - {len(intermediate_output.split())} tokens")
                 i += 1
                 chunks = list(make_chunks(intermediate_output, CHUNK_SIZE))
                 intermediate_output = ""
+
+                # Form input
                 if TASK == "qa":
                     chunks = ["<|question|> " + question + "\n<|context|> " + c + "\n<|facts|>" for c in chunks]
                 elif TASK == "translation":
@@ -308,8 +339,13 @@ if __name__ == "__main__":
                 elif TASK == "summarization":
                     chunks = ["<|input|> " + c + "\n<|output|>" for c in chunks]
 
+                log_filename = os.path.join(wandb.run.dir, f"example_{ex_idx:06}", f"{i:06}_output.txt")
+                log_f = open(log_filename, 'w')
+
+                # Predict each chunk
                 for chunk in tqdm(chunks):
                     output = chunk + infer(chunk, output_length=TASK_MAP[TASK]["output_max_len"])
+                    log_f.write(output + "\n<|endoftext|>\n" + "-" * 50 + "\n")
                     output_d = parse_lm_string(output)
                     if TASK == "qa":
                         intermediate_output += " " + output_d.get("fact", "")
@@ -317,6 +353,7 @@ if __name__ == "__main__":
                         final_output += " " + output_d.get("output", "")
                     if TASK == "summarization":
                         intermediate_output += " " + output_d.get("output", "")
+
 
             # Final output
             if TASK == "qa":
@@ -336,12 +373,27 @@ if __name__ == "__main__":
                 output_d = parse_lm_string(output)
                 pred_answer = output_d.get("output", "")
 
-            print(pred_answer[:100])
-            print(true_answer[:100])
             preds.append(pred_answer)
             trues.append(true_answer)
 
+            metrics = seq2seq_metrics(preds, trues)
+            logger.info(metrics)
+            wandb.log(metrics)
+            preds_table.add_data(ex_idx, text.strip(), true_answer, pred_answer)
+
             print(f"example done in {time.time() - start:06}s")
-            breakpoint()
 
+        def save_output(name, output_var):
+            log_filename = os.path.join(wandb.run.dir, name + ".txt")
+            with open(log_filename, 'w') as f:
+                for s in output_var:
+                    if isinstance(s, list):
+                        s = s[0]
+                    f.write(s.replace("\n", " ") + "\n")
 
+        save_output("preds", preds)
+        save_output("trues", trues)
+
+        metrics = seq2seq_metrics(preds, trues)
+        wandb.run.summary.update(metrics)
+        wandb.run.log({"predictions" : preds_table})
