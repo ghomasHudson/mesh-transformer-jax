@@ -1,0 +1,42 @@
+{
+  "layers": 28,
+  "d_model": 4096,
+  "n_heads": 16,
+  "n_vocab": 50400,
+  "norm": "layernorm",
+  "pe": "rotary",
+  "pe_rotary_dims": 64,
+
+  "seq": 2048,
+  "cores_per_replica": 8,
+  "per_replica_batch": 1,
+  "gradient_accumulation_steps": 32,
+
+  "warmup_steps": 826,
+  "anneal_steps": 7436,
+  "lr": 5e-5,
+  "end_lr": 1e-5,
+  "weight_decay": 0.1,
+  "total_steps": 8262,
+
+  "tpu_size": 8,
+
+  "bucket": "muld_data",
+  "model_dir": "models/gptj_booksum_fixed_input",
+
+  "train_set": "booksum_fixed_input.train.index",
+  "val_set": {
+    "dummy": "booksum_fixed_input.train.index"
+  },
+
+  "eval_harness_tasks": [],
+
+  "val_batches": 100,
+  "val_every": 99999999,
+  "ckpt_every": 500,
+  "keep_every": 10000,
+
+  "name": "GPT3_6B_booksum_fixed_input",
+  "wandb_project": "GPT3_6B_long_doc",
+  "comment": "Training GPTJ_6B on openai booksum machine samples"
+}
