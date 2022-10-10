@@ -376,20 +376,21 @@ if __name__ == "__main__":
 
 
             # Final output
+            log_filename = os.path.join(wandb.run.dir, f"example_{ex_idx:06}", f"{i+1:06}_output.txt")
+            log_f = open(log_filename, 'w')
+
             if TASK == "qa":
                 chunk = "<|question|> " + question + "\n<|context|> " + intermediate_output + "\n<|facts|>"
                 output = chunk + infer(chunk)
+                log_f.write(output + "\n<|endoftext|>\n" + "-" * 50 + "\n")
                 output_d = parse_lm_string(output)
                 pred_answer = output_d.get("answer", "")
             if TASK == "translation":
-                #chunk = "<|input|> " + intermediate_output + "\n<|output|>"
-                #output = chunk + infer(chunk)
-                #output_d = parse_lm_string(output)
-                #pred_answer = output_d.get("output", "")
                 pred_answer = final_output
             if TASK == "summarization":
                 chunk = "<|input|> " + intermediate_output + "\n<|output|>"
                 output = chunk + infer(chunk)
+                log_f.write(output + "\n<|endoftext|>\n" + "-" * 50 + "\n")
                 output_d = parse_lm_string(output)
                 pred_answer = output_d.get("output", "")
 
