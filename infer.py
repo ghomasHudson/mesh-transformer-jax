@@ -328,12 +328,19 @@ if __name__ == "__main__":
                     except:
                         continue
                 true_answer = ex["output"][0]
-            if TASK == "translation":
+            elif TASK == "translation":
                 text = ex["translation"]["en"]
                 true_answer = ex["translation"]["de"]
-            if TASK == "summarization":
+            elif TASK == "summarization":
                 text = ex["input"]
                 true_answer = ex["output"]
+            elif TASK == "char_id":
+                text = ex["document"]["text"]
+                char = ex["character_name"]
+                true_answer = ds.features["character_name"].int2str(ex["character_type"])
+                if true_answer not in ["Hero", "Antagonist"]:
+                    continue
+
 
 
             intermediate_output = text.strip()
@@ -358,6 +365,16 @@ if __name__ == "__main__":
                     chunks = ["<|input|> " + c + "\n<|output|>" for c in chunks]
                 elif TASK == "summarization":
                     chunks = ["<|input|> " + c + "\n<|output|>" for c in chunks]
+                elif TASK == "char_id":
+                    new_chunks = []
+                    for c in chunks:
+                        if "|" not in chunks:
+                            chunks = ["<|character|> " + char + "\n<|text|> " + c + "\n<|output|>" for c in chunks]
+                        else:
+                            chunks = ["<|text|> " + c + "\n<|output|>" for c in chunks]
+                    chunks = new_chunks
+
+
 
                 log_filename = os.path.join(wandb.run.dir, f"example_{ex_idx:06}", f"{i:06}_output.txt")
                 log_f = open(log_filename, 'w')
@@ -371,7 +388,9 @@ if __name__ == "__main__":
                         intermediate_output += " " + output_d.get("fact", "")
                     elif TASK == "translation":
                         final_output += " " + output_d.get("output", "")
-                    if TASK == "summarization":
+                    elif TASK == "summarization":
+                        intermediate_output += " " + output_d.get("output", "")
+                    elif TASK == "char_id":
                         intermediate_output += " " + output_d.get("output", "")
 
 
@@ -385,14 +404,21 @@ if __name__ == "__main__":
                 log_f.write(output + "\n<|endoftext|>\n" + "-" * 50 + "\n")
                 output_d = parse_lm_string(output)
                 pred_answer = output_d.get("answer", "")
-            if TASK == "translation":
+            elif TASK == "translation":
                 pred_answer = final_output
-            if TASK == "summarization":
+            elif TASK == "summarization":
                 chunk = "<|input|> " + intermediate_output + "\n<|output|>"
                 output = chunk + infer(chunk)
                 log_f.write(output + "\n<|endoftext|>\n" + "-" * 50 + "\n")
                 output_d = parse_lm_string(output)
                 pred_answer = output_d.get("output", "")
+            elif TASK == "char_id":
+                chunk = "<|text|> " + intermediate_output + "\n<|output|>"
+                output = chunk + infer(chunk)
+                output_d = parse_lm_string(output)
+                pred_answer = output_d.get("output", "")
+                pred_answer = pred_answer.replace("|", "")
+                pred_answer = pred_answer.strip()
 
             preds.append(pred_answer)
             trues.append(true_answer)
