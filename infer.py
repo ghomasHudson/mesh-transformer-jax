@@ -393,6 +393,9 @@ if __name__ == "__main__":
                     elif TASK == "char_id":
                         intermediate_output += " " + output_d.get("output", "")
 
+                log_f.close()
+                wandb.save(log_filename)
+
 
             # Final output
             log_filename = os.path.join(wandb.run.dir, f"example_{ex_idx:06}", f"{i+1:06}_output.txt")
@@ -406,6 +409,7 @@ if __name__ == "__main__":
                 pred_answer = output_d.get("answer", "")
             elif TASK == "translation":
                 pred_answer = final_output
+                log_f.write(final_output)
             elif TASK == "summarization":
                 chunk = "<|input|> " + intermediate_output + "\n<|output|>"
                 output = chunk + infer(chunk)
@@ -419,6 +423,9 @@ if __name__ == "__main__":
                 pred_answer = output_d.get("output", "")
                 pred_answer = pred_answer.replace("|", "")
                 pred_answer = pred_answer.strip()
+
+            log_f.close()
+            wandb.save(log_filename)
 
             preds.append(pred_answer)
             trues.append(true_answer)
