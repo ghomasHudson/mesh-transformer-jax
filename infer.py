@@ -369,9 +369,9 @@ if __name__ == "__main__":
                     new_chunks = []
                     for c in chunks:
                         if "|" not in chunks:
-                            chunks = ["<|character|> " + char + "\n<|text|> " + c + "\n<|output|>" for c in chunks]
+                            new_chunks.append("<|character|> " + char + "\n<|text|> " + c + "\n<|output|>")
                         else:
-                            chunks = ["<|text|> " + c + "\n<|output|>" for c in chunks]
+                            new_chunks.append("<|text|> " + c + "\n<|output|>")
                     chunks = new_chunks
 
 
