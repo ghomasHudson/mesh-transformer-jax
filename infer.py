@@ -377,7 +377,6 @@ if __name__ == "__main__":
                 logger.info(f"Level {i} - {len(intermediate_output.split())} tokens")
                 i += 1
                 chunks = list(make_chunks(intermediate_output, CHUNK_SIZE))
-                intermediate_output = ""
 
                 # Form input
                 if TASK == "qa":
@@ -398,6 +397,7 @@ if __name__ == "__main__":
 
 
 
+                intermediate_output = ""
                 log_filename = os.path.join(wandb.run.dir, f"example_{ex_idx:06}", f"{i:06}_output.txt")
                 log_f = open(log_filename, 'w')
 
