@@ -419,6 +419,7 @@ if __name__ == "__main__":
             elif TASK == "char_id":
                 chunk = "<|text|> " + intermediate_output + "\n<|output|>"
                 output = chunk + infer(chunk)
+                log_f.write(output + "\n<|endoftext|>\n" + "-" * 50 + "\n")
                 output_d = parse_lm_string(output)
                 pred_answer = output_d.get("output", "")
                 pred_answer = pred_answer.replace("|", "")
