@@ -196,6 +196,27 @@ def make_chunks(lst, n):
             yield lst[i:i + n]
 
 
+def make_line_chunks(context_lines, n):
+    '''Chunks but never split within a line'''
+    def calc_chunk_length(chunk):
+        # return len(tokenizer.tokenize(" ".join(chunk)))
+        return len(" ".join(chunk).split(" "))
+
+    if isinstance(context_lines, str):
+        context_lines = context_lines.split("\n")
+    idx = 0
+    context_chunks = []
+    while idx < len(context_lines):
+        context_chunk = []
+        answer_chunk = []
+        while idx < len(context_lines) and calc_chunk_length(context_chunk + [context_lines[idx]]) < n:
+            context_chunk = context_chunk + [context_lines[idx]]
+            idx += 1
+        context_chunk = "\n".join(context_chunk)
+        context_chunks.append(context_chunk)
+    return context_chunks
+
+
 def infer(context, output_length=512):
     '''Produces an inference from a context input'''
     start = time.time()
@@ -362,6 +383,7 @@ if __name__ == "__main__":
                 if TASK == "qa":
                     chunks = ["<|question|> " + question + "\n<|context|> " + c + "\n<|facts|>" for c in chunks]
                 elif TASK == "translation":
+                    chunks = list(make_line_chunks(intermediate_output, CHUNK_SIZE))
                     chunks = ["<|input|> " + c + "\n<|output|>" for c in chunks]
                 elif TASK == "summarization":
                     chunks = ["<|input|> " + c + "\n<|output|>" for c in chunks]
