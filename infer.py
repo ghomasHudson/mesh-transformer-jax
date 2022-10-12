@@ -337,7 +337,7 @@ if __name__ == "__main__":
             elif TASK == "char_id":
                 text = ex["document"]["text"]
                 char = ex["character_name"]
-                true_answer = ds.features["character_name"].int2str(ex["character_type"])
+                true_answer = ds.features["character_type"].int2str(ex["character_type"])
                 if true_answer not in ["Hero", "Antagonist"]:
                     continue
 
