@@ -394,7 +394,7 @@ if __name__ == "__main__":
                         intermediate_output += " " + output_d.get("output", "")
 
                 log_f.close()
-                wandb.save(log_filename)
+                wandb.save(log_filename, base_path=wandb.run.dir)
 
 
             # Final output
@@ -425,7 +425,7 @@ if __name__ == "__main__":
                 pred_answer = pred_answer.strip()
 
             log_f.close()
-            wandb.save(log_filename)
+            wandb.save(log_filename, base_path=wandb.run.dir)
 
             preds.append(pred_answer)
             trues.append(true_answer)
