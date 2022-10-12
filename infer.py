@@ -391,7 +391,7 @@ if __name__ == "__main__":
                     elif TASK == "summarization":
                         intermediate_output += " " + output_d.get("output", "")
                     elif TASK == "char_id":
-                        intermediate_output += " " + output_d.get("output", "")
+                        intermediate_output += " " + output_d.get("output", "").strip()
 
                 log_f.close()
                 wandb.save(log_filename, base_path=wandb.run.dir)
