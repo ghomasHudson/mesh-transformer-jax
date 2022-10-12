@@ -390,7 +390,7 @@ if __name__ == "__main__":
                 elif TASK == "char_id":
                     new_chunks = []
                     for c in chunks:
-                        if "|" not in chunks:
+                        if "|" not in c:
                             new_chunks.append("<|character|> " + char + "\n<|text|> " + c + "\n<|output|>")
                         else:
                             new_chunks.append("<|text|> " + c + "\n<|output|>")
@@ -413,7 +413,7 @@ if __name__ == "__main__":
                     elif TASK == "summarization":
                         intermediate_output += " " + output_d.get("output", "")
                     elif TASK == "char_id":
-                        intermediate_output += " " + output_d.get("output", "").strip()
+                        intermediate_output += re.sub(' +', ' ', " " + output_d.get("output", ""))
 
                 log_f.close()
                 wandb.save(log_filename, base_path=wandb.run.dir)
@@ -431,7 +431,7 @@ if __name__ == "__main__":
                 pred_answer = output_d.get("answer", "")
             elif TASK == "translation":
                 pred_answer = final_output
-                log_f.write(final_output)
+                log_f.write("<|output|> "+ final_output)
             elif TASK == "summarization":
                 chunk = "<|input|> " + intermediate_output + "\n<|output|>"
                 output = chunk + infer(chunk)
