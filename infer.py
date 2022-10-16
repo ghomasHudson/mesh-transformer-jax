@@ -407,7 +407,7 @@ if __name__ == "__main__":
                     log_f.write(output + "\n<|endoftext|>\n" + "-" * 50 + "\n")
                     output_d = parse_lm_string(output)
                     if TASK == "qa":
-                        intermediate_output += " " + output_d.get("fact", "")
+                        intermediate_output += " " + output_d.get("facts", "")
                     elif TASK == "translation":
                         final_output += " " + output_d.get("output", "")
                     elif TASK == "summarization":
