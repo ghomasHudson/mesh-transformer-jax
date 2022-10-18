@@ -48,6 +48,12 @@ TASK_MAP = {
         "output_max_len": int(CHUNK_SIZE * 0.75)
         #"output_max_len": 5
     }
+    "style_change": {
+        "model": "ghomasHudson/booksum",
+        "dataset": "ghomasHudson/ao3_style_change",
+        "output_max_len": int(CHUNK_SIZE * 0.75)
+        #"output_max_len": 5
+    }
 }
 
 
@@ -255,6 +261,8 @@ if __name__ == "__main__":
             TASK = "qa"
         elif "char" in args.config:
             TASK = "char_id"
+        elif "style_change" in args.config:
+            TASK = "style_change"
     else:
         TASK == args.task_type
     logger.info(f"Set task type to {TASK}")
@@ -361,7 +369,9 @@ if __name__ == "__main__":
                 true_answer = ds.features["character_type"].int2str(ex["character_type"])
                 if true_answer not in ["Hero", "Antagonist"]:
                     continue
-
+            elif TASK == "style_change":
+                text = "\n".join(ex["paragraphs"])
+                true_answer = " ".join(ex["paragraph-authors"])
 
 
             intermediate_output = text.strip()
@@ -394,7 +404,8 @@ if __name__ == "__main__":
                         else:
                             new_chunks.append("<|text|> " + c + "\n<|output|>")
                     chunks = new_chunks
-
+                elif TASK == "style_change":
+                    chunks = ["<|text|> " + c + "\n<|output|>" for c in chunks]
 
 
                 intermediate_output = ""
@@ -414,6 +425,9 @@ if __name__ == "__main__":
                         intermediate_output += " " + output_d.get("output", "")
                     elif TASK == "char_id":
                         intermediate_output += re.sub(' +', ' ', " " + output_d.get("output", ""))
+                    elif TASK == "style_change":
+                        breakpoint()
+                        raise NotImplementedError()
 
                 log_f.close()
                 wandb.save(log_filename, base_path=wandb.run.dir)
@@ -446,6 +460,8 @@ if __name__ == "__main__":
                 pred_answer = output_d.get("output", "")
                 pred_answer = pred_answer.replace("|", "")
                 pred_answer = pred_answer.strip()
+            elif TASK == "style_change":
+                raise NotImplementedError()
 
             log_f.close()
             wandb.save(log_filename, base_path=wandb.run.dir)
