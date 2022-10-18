@@ -47,7 +47,7 @@ TASK_MAP = {
         "dataset": "ghomasHudson/booksum_ds",
         "output_max_len": int(CHUNK_SIZE * 0.75)
         #"output_max_len": 5
-    }
+    },
     "style_change": {
         "model": "ghomasHudson/booksum",
         "dataset": "ghomasHudson/ao3_style_change",
@@ -371,7 +371,7 @@ if __name__ == "__main__":
                     continue
             elif TASK == "style_change":
                 text = "\n".join(ex["paragraphs"])
-                true_answer = " ".join(ex["paragraph-authors"])
+                true_answer = " ".join([str(a) for a in ex["paragraph-authors"]])
 
 
             intermediate_output = text.strip()
@@ -407,7 +407,6 @@ if __name__ == "__main__":
                 elif TASK == "style_change":
                     chunks = ["<|text|> " + c + "\n<|output|>" for c in chunks]
 
-
                 intermediate_output = ""
                 log_filename = os.path.join(wandb.run.dir, f"example_{ex_idx:06}", f"{i:06}_output.txt")
                 log_f = open(log_filename, 'w')
@@ -426,8 +425,7 @@ if __name__ == "__main__":
                     elif TASK == "char_id":
                         intermediate_output += re.sub(' +', ' ', " " + output_d.get("output", ""))
                     elif TASK == "style_change":
-                        breakpoint()
-                        raise NotImplementedError()
+                        intermediate_output += output.split("<|output|> ", 1)[1].strip() + " "
 
                 log_f.close()
                 wandb.save(log_filename, base_path=wandb.run.dir)
@@ -461,7 +459,11 @@ if __name__ == "__main__":
                 pred_answer = pred_answer.replace("|", "")
                 pred_answer = pred_answer.strip()
             elif TASK == "style_change":
-                raise NotImplementedError()
+                chunk = "<|text|> " + intermediate_output + "\n<|output|>"
+                output = infer(chunk)
+                pred_answer = output.split("<|indexes|> ")[-1]
+                pred_answer = pred_answer.replace("|", "")
+                pred_answer = pred_answer.strip()
 
             log_f.close()
             wandb.save(log_filename, base_path=wandb.run.dir)
