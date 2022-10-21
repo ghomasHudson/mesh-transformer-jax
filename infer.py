@@ -420,7 +420,7 @@ if __name__ == "__main__":
                         elif TASK == "summarization":
                             chunk = "<|question|> What is the summary?\n" + chunk
                         elif TASK == "char_id":
-                            chunk = "<|question|> Is {char} a Hero or Antagonist\n<|text|>" + chunk.split("<|text|>", 1)[1]
+                            chunk = f"<|question|> Is {char} a Hero or Antagonist\n<|text|>" + chunk.split("<|text|>", 1)[1]
                         elif TASK == "style_change":
                             chunk = "<|question|> Identify the author for each paragraph\n" + chunk
 
