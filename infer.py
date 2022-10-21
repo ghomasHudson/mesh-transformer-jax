@@ -174,6 +174,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default=None, help="Config file location")
     parser.add_argument("--task_type", type=str, nargs="?", default=None, choices=list(TASK_MAP.keys()), help="Task type")
+    parser.add_argument("--multitask", action="store_true", help="Whether to evaluate a multitask model")
 
     args = parser.parse_args()
     return args
@@ -252,7 +253,7 @@ if __name__ == "__main__":
     params = json.load(open(args.config))
 
     # Infer task type (override if specified)
-    if args.task_type is None:
+    if args.task_type is None and not args.multitask:
         if "long_contra_pro" in args.config:
             TASK = "translation"
         elif "booksum" in args.config:
@@ -413,6 +414,17 @@ if __name__ == "__main__":
 
                 # Predict each chunk
                 for chunk in tqdm(chunks):
+                    if args.multitask:
+                        if TASK == "translation":
+                            chunk = "<|question|> Translate from English to German\n" + chunk
+                        elif TASK == "summarization":
+                            chunk = "<|question|> What is the summary?\n" + chunk
+                        elif TASK == "char_id":
+                            chunk = "<|question|> Is {char} a Hero or Antagonist\n<|text|>" + chunk.split("<|text|>", 1)[1]
+                        elif TASK == "style_change":
+                            chunk = "<|question|> Identify the author for each paragraph\n" + chunk
+
+
                     output = chunk + infer(chunk, output_length=TASK_MAP[TASK]["output_max_len"])
                     log_f.write(output + "\n<|endoftext|>\n" + "-" * 50 + "\n")
                     output_d = parse_lm_string(output)
