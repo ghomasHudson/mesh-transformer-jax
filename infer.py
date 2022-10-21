@@ -265,7 +265,7 @@ if __name__ == "__main__":
         elif "style_change" in args.config:
             TASK = "style_change"
     else:
-        TASK == args.task_type
+        TASK = args.task_type
     logger.info(f"Set task type to {TASK}")
 
     gradient_accumulation_steps = params.get("gradient_accumulation_steps", 1)
