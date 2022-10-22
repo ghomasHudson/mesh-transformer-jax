@@ -223,6 +223,16 @@ def make_line_chunks(context_lines, n):
         context_chunks.append(context_chunk)
     return context_chunks
 
+def make_num_lines_chunks(context, num_lines):
+    assert isinstance(context, str)
+    context = context.split("\n")
+
+    def chunker(lst, n):
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
+    chunks = chunker(context, num_lines)
+    return ["\n".join(c) for c in chunks]
+
 
 def infer(context, output_length=512):
     '''Produces an inference from a context input'''
@@ -393,7 +403,7 @@ if __name__ == "__main__":
                 if TASK == "qa":
                     chunks = ["<|question|> " + question + "\n<|context|> " + c + "\n<|facts|>" for c in chunks]
                 elif TASK == "translation":
-                    chunks = list(make_line_chunks(intermediate_output, CHUNK_SIZE))
+                    chunks = list(make_num_line_chunks(intermediate_output, 10))
                     chunks = ["<|input|> " + c + "\n<|output|>" for c in chunks]
                 elif TASK == "summarization":
                     chunks = ["<|input|> " + c + "\n<|output|>" for c in chunks]
