@@ -1,0 +1,92 @@
+<html><body>
+
+<!--
+#############################################
+## Amazon Turk layout
+#############################################
+-->
+
+<script src="https://assets.crowd.aws/crowd-html-elements.js"></script>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+<script src="https://code.jquery.com/jquery-3.4.0.min.js"></script>
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.1/css/all.css" integrity="sha384-50oBUHEmvpQ+1lW4y57PTFmhCaXp0ML5d60M1M7uH2+nqUivzIebhndOJK28anvf" crossorigin="anonymous">
+<style>
+    body{
+        background-color: #444444;
+        background: repeating-linear-gradient(
+            45deg,
+            #222222,
+            #222222 3px,
+            #111111 3px,
+            #111111 6px
+);
+    }
+    p{
+        margin-bottom:0.5em !important;
+    }
+    .container{
+        background: white;
+    }
+    .imagecontainer{
+        height:600px;
+        width: auto;
+    }
+    h1 { font-size: 1.8em !important; }
+    h2 {font-size:1.3em !important;}
+    form {font-size:1em !important}
+</style>
+
+<div class="container clearfix" style="height: 100vh !important;overflow:auto !important">
+<div class="card">
+    <div class="card-header" style="background-color:#9999AA"><b>Instructions</b></div>
+    <div class="card-body" style="padding-bottom:0;padding-top:10px;background-color:#DDDDEE">
+
+<!-- For the full list of available Crowd HTML Elements and their input/output documentation,
+      please refer to https://docs.aws.amazon.com/sagemaker/latest/dg/sms-ui-template-reference.html -->
+<p>A famous book has been summarised into a single paragraph by 2 different writers. Your tasks is to rate how well they did based on a description of the plot from wikipedia. Here are some things you should take into account:</p>
+<ul>
+    <li><b>Coverage</b> - All information in the summary should be important, and there should be no
+other more important information omitted from the summary. So gratuitously including small details is generally penalized, and omitting important details is also penalized.
+    <li><b>Accuracy</b> - All information in the summary should faithfully reflect the original book.
+    <li><b>Coherence</b> - Ignoring the wikipedia plot description, the summary itself should not be confusing, ambiguous, or logically incoherent.
+
+<h2>Your task is</h2>
+<ul>
+    <li>Read a wikipedia plot description carefully</li>
+    <li>Rate how good the 2 summaries are of the same book.</li>
+</ul>
+</div>
+</div>
+<br>
+<h1>HIT</h1>
+<!-- You must include crowd-form so that your task submits answers to MTurk -->
+<crowd-form answer-format="flatten-objects" class="clearfix">
+<p>Imagine our language task is that we want the computer program to ${context}.</p>
+
+<p>Give 5 paraphrases of the following prompt:</p>
+
+<div class="card">
+  <div class="card-header">
+    Prompt
+  </div>
+  <div class="card-body" style="text-align:center">
+    <b>"${prompt}"</b>
+  </div>
+</div>
+<br>
+<p style="font-size:1em"><i>Example paraphrases:
+${examples}
+</i></p>
+<hr>
+<strong>Answer here:</strong>
+    <crowd-input name="para1" placeholder="Type a paraphrase of the prompt here" required></crowd-input>
+    <crowd-input name="para2" placeholder="Type a different paraphrase of the prompt here" required></crowd-input>
+    <crowd-input name="para3" placeholder="Type a different paraphrase of the prompt here" required/></crowd-input>
+    <crowd-input name="para4" placeholder="Type a different paraphrase of the prompt here" required/></crowd-input>
+    <crowd-input name="para5" placeholder="Type a different paraphrase of the prompt here" required/></crowd-input>
+
+
+</crowd-form>
+</div>
+</body></html>
+
