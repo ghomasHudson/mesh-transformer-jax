@@ -175,6 +175,7 @@ def parse_args():
     parser.add_argument("--config", type=str, default=None, help="Config file location")
     parser.add_argument("--task_type", type=str, nargs="?", default=None, choices=list(TASK_MAP.keys()), help="Task type")
     parser.add_argument("--multitask", action="store_true", help="Whether to evaluate a multitask model")
+    parser.add_argument("--paraphrase", action="store_true", help="Whether to evaluate a using paraphrased questions")
 
     args = parser.parse_args()
     return args
@@ -426,9 +427,19 @@ if __name__ == "__main__":
                 for chunk in tqdm(chunks):
                     if args.multitask:
                         if TASK == "translation":
-                            chunk = "<|question|> Translate from English to German\n" + chunk
+                            if args.paraphrase:
+                                questions = open("./data/paraphrased_questions/translation.test").readlines()
+                                question = random.choices(questions).strip()
+                            else:
+                                question = "Translate from English to German"
+                            chunk = "<|question|> " + question + "\n" + chunk
                         elif TASK == "summarization":
-                            chunk = "<|question|> What is the summary?\n" + chunk
+                            if args.paraphrase:
+                                questions = open("./data/paraphrased_questions/summarization.test").readlines()
+                                question = random.choices(questions).strip()
+                            else:
+                                question = "What is the summary?\n"
+                            chunk = "<|question|> " + question + "\n" + chunk
                         elif TASK == "char_id":
                             chunk = f"<|question|> Is {char} a Hero or Antagonist\n<|text|>" + chunk.split("<|text|>", 1)[1]
                         elif TASK == "style_change":
