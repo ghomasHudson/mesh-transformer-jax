@@ -430,14 +430,14 @@ if __name__ == "__main__":
                         if TASK == "translation":
                             if args.paraphrase:
                                 questions = open("./data/paraphrased_questions/translation.test").readlines()
-                                question = random.choices(questions).strip()
+                                question = random.choice(questions).strip()
                             else:
                                 question = "Translate from English to German"
                             chunk = "<|question|> " + question + "\n" + chunk
                         elif TASK == "summarization":
                             if args.paraphrase:
                                 questions = open("./data/paraphrased_questions/summarization.test").readlines()
-                                question = random.choices(questions).strip()
+                                question = random.choice(questions).strip()
                             else:
                                 question = "What is the summary?\n"
                             chunk = "<|question|> " + question + "\n" + chunk
