@@ -225,7 +225,7 @@ def make_line_chunks(context_lines, n):
         context_chunks.append(context_chunk)
     return context_chunks
 
-def make_num_lines_chunks(context, num_lines):
+def make_num_line_chunks(context, num_lines):
     assert isinstance(context, str)
     context = context.split("\n")
 
